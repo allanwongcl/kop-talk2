@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../lib/supabaseClient';
 import { MATCHES } from '../lib/matches';
+import { useLiveScore } from '../lib/useLiveScore';
+import { deriveDisplay } from '../lib/liveScore';
 
 function Ticker() {
   const text = MATCHES.map((m) => `${m.home} vs ${m.away} — ${m.status}`).join('    •    ');
@@ -13,6 +15,38 @@ function Ticker() {
         {text}    •    {text}
       </div>
     </div>
+  );
+}
+
+function MatchCard({ match, count }) {
+  const live = useLiveScore(match.footballDataId);
+  const display = deriveDisplay(match, live);
+
+  return (
+    <Link
+      href={`/match/${match.id}`}
+      className="block bg-[#10141f] hover:bg-[#161b29] border border-white/5 rounded-lg p-4 transition-colors"
+    >
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-[11px] uppercase tracking-wider text-red-500 font-semibold">
+          {match.comp}
+        </span>
+        {display.isLive && (
+          <span className="text-[11px] uppercase tracking-wider text-red-500 font-semibold animate-pulse">
+            ● Live
+          </span>
+        )}
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-white font-bold text-lg">{match.home}</span>
+        <span className="mx-3 text-2xl font-mono font-bold text-red-500">{display.score}</span>
+        <span className="text-white font-bold text-lg text-right">{match.away}</span>
+      </div>
+      <div className="mt-2 flex justify-between items-center">
+        <span className="text-xs text-gray-500">{display.label}</span>
+        <span className="text-xs text-gray-400">{count} comments</span>
+      </div>
+    </Link>
   );
 }
 
@@ -52,26 +86,7 @@ export default function Home() {
         <div className="max-w-2xl mx-auto space-y-3">
           <p className="text-xs uppercase tracking-widest text-gray-500 mb-1">Match threads</p>
           {MATCHES.map((m) => (
-            <Link
-              key={m.id}
-              href={`/match/${m.id}`}
-              className="block bg-[#10141f] hover:bg-[#161b29] border border-white/5 rounded-lg p-4 transition-colors"
-            >
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-[11px] uppercase tracking-wider text-red-500 font-semibold">
-                  {m.comp}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-white font-bold text-lg">{m.home}</span>
-                <span className="mx-3 text-2xl font-mono font-bold text-red-500">{m.score}</span>
-                <span className="text-white font-bold text-lg text-right">{m.away}</span>
-              </div>
-              <div className="mt-2 flex justify-between items-center">
-                <span className="text-xs text-gray-500">{m.status}</span>
-                <span className="text-xs text-gray-400">{counts[m.id] || 0} comments</span>
-              </div>
-            </Link>
+            <MatchCard key={m.id} match={m} count={counts[m.id] || 0} />
           ))}
         </div>
       </main>

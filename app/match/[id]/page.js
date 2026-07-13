@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
 import { getMatch } from '../../../lib/matches';
+import { useLiveScore } from '../../../lib/useLiveScore';
+import { deriveDisplay } from '../../../lib/liveScore';
 
 const REACTIONS = ['🔴', '⚽', '😱', '🔥', '😂'];
 
@@ -17,6 +19,7 @@ function timeAgo(iso) {
 
 export default function MatchThread({ params }) {
   const match = getMatch(params.id);
+  const live = useLiveScore(match?.footballDataId);
   const [posts, setPosts] = useState([]);
   const [name, setName] = useState('');
   const [text, setText] = useState('');
@@ -85,6 +88,8 @@ export default function MatchThread({ params }) {
     );
   }
 
+  const matchDisplay = deriveDisplay(match, live);
+
   return (
     <main className="px-5 py-6 max-w-2xl mx-auto">
       <Link href="/" className="text-red-500 text-sm mb-4 inline-block hover:text-red-400">
@@ -92,15 +97,22 @@ export default function MatchThread({ params }) {
       </Link>
 
       <div className="bg-[#10141f] border border-white/5 rounded-lg p-4 mb-4">
-        <div className="text-[11px] uppercase tracking-wider text-red-500 font-semibold mb-1">
-          {match.comp}
+        <div className="flex justify-between items-center mb-1">
+          <span className="text-[11px] uppercase tracking-wider text-red-500 font-semibold">
+            {match.comp}
+          </span>
+          {matchDisplay.isLive && (
+            <span className="text-[11px] uppercase tracking-wider text-red-500 font-semibold animate-pulse">
+              ● Live
+            </span>
+          )}
         </div>
         <div className="flex items-center justify-between">
           <span className="text-white font-bold text-xl">{match.home}</span>
-          <span className="mx-3 text-3xl font-mono font-bold text-red-500">{match.score}</span>
+          <span className="mx-3 text-3xl font-mono font-bold text-red-500">{matchDisplay.score}</span>
           <span className="text-white font-bold text-xl text-right">{match.away}</span>
         </div>
-        <div className="text-xs text-gray-500 mt-1">{match.status}</div>
+        <div className="text-xs text-gray-500 mt-1">{matchDisplay.label}</div>
       </div>
 
       <p className="text-xs uppercase tracking-widest text-gray-500 mb-3">Match reactions</p>
