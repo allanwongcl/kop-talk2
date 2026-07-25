@@ -17,6 +17,11 @@ function timeAgo(iso) {
   return `${Math.floor(s / 86400)}d ago`;
 }
 
+function reactedLocally(postId, emoji) {
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(`koptalk:reacted:${postId}:${emoji}`) === '1';
+}
+
 export default function MatchThread({ params }) {
   const match = getMatch(params.id);
   const live = useLiveScore(match?.footballDataId);
@@ -24,6 +29,9 @@ export default function MatchThread({ params }) {
   const [name, setName] = useState('');
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [posting, setPosting] = useState(false);
+  const [postError, setPostError] = useState(null);
+  const [reactionError, setReactionError] = useState(null);
 
   useEffect(() => {
     if (!match) return;
@@ -57,26 +65,63 @@ export default function MatchThread({ params }) {
   }
 
   async function addPost() {
-    if (!text.trim()) return;
-    const { error } = await supabase.from('posts').insert({
+    if (!text.trim()) {
+      setPostError('Write something before posting.');
+      return;
+    }
+    setPostError(null);
+    setPosting(true);
+
+    const optimisticPost = {
+      id: `optimistic-${Date.now()}`,
       match_id: match.id,
       name: name.trim() || 'Anonymous Red',
       text: text.trim(),
       reactions: {},
+      created_at: new Date().toISOString(),
+    };
+    setPosts((prev) => [...prev, optimisticPost]);
+
+    const { error } = await supabase.from('posts').insert({
+      match_id: match.id,
+      name: optimisticPost.name,
+      text: optimisticPost.text,
+      reactions: {},
     });
+
+    setPosting(false);
+
     if (error) {
       console.error(error);
+      setPosts((prev) => prev.filter((p) => p.id !== optimisticPost.id));
+      setPostError("Couldn't post your comment — check your connection and try again.");
       return;
     }
+
     setText('');
   }
 
   async function react(postId, emoji) {
     const post = posts.find((p) => p.id === postId);
+    if (!post) return;
+
+    const alreadyReacted = reactedLocally(postId, emoji);
+    const delta = alreadyReacted ? -1 : 1;
     const reactions = { ...post.reactions };
-    reactions[emoji] = (reactions[emoji] || 0) + 1;
+    reactions[emoji] = Math.max(0, (reactions[emoji] || 0) + delta);
+
+    setPosts((prev) => prev.map((p) => (p.id === postId ? { ...p, reactions } : p)));
+    if (typeof window !== 'undefined') {
+      const key = `koptalk:reacted:${postId}:${emoji}`;
+      if (alreadyReacted) window.localStorage.removeItem(key);
+      else window.localStorage.setItem(key, '1');
+    }
+
     const { error } = await supabase.from('posts').update({ reactions }).eq('id', postId);
-    if (error) console.error(error);
+    if (error) {
+      console.error(error);
+      setReactionError("Couldn't save your reaction — try again.");
+    }
   }
 
   if (!match) {
@@ -112,34 +157,53 @@ export default function MatchThread({ params }) {
           <span className="mx-3 text-3xl font-mono font-bold text-red-500">{matchDisplay.score}</span>
           <span className="text-white font-bold text-xl text-right">{match.away}</span>
         </div>
-        <div className="text-xs text-gray-500 mt-1">{matchDisplay.label}</div>
+        <div className="text-xs text-gray-400 mt-1">{matchDisplay.label}</div>
       </div>
 
-      <p className="text-xs uppercase tracking-widest text-gray-500 mb-3">Match reactions</p>
+      <p className="inline-block text-xs uppercase tracking-widest text-gray-300 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded mb-3">
+        Match reactions
+      </p>
 
-      {loading && <p className="text-gray-500 text-sm">Loading thread…</p>}
+      {loading && (
+        <p className="inline-block text-gray-400 text-sm bg-black/30 backdrop-blur-sm px-2 py-1 rounded">
+          Loading thread…
+        </p>
+      )}
 
       <div className="space-y-3 mb-4">
         {!loading && posts.length === 0 && (
-          <p className="text-gray-500 text-sm italic">No comments yet. Be the first Red to sound off.</p>
+          <div className="text-center text-gray-400 text-sm italic bg-black/30 backdrop-blur-sm border border-white/5 rounded-lg py-6 px-4">
+            No comments yet. Be the first Red to sound off.
+          </div>
+        )}
+        {reactionError && (
+          <p className="text-red-400 text-xs">{reactionError}</p>
         )}
         {posts.map((p) => (
           <div key={p.id} className="bg-[#10141f] border border-white/5 rounded-lg p-3">
             <div className="flex justify-between items-baseline mb-1">
               <span className="text-red-400 font-semibold text-sm">{p.name}</span>
-              <span className="text-gray-600 text-xs">{timeAgo(p.created_at)}</span>
+              <span className="text-gray-400 text-xs">{timeAgo(p.created_at)}</span>
             </div>
             <p className="text-gray-200 text-sm mb-2 whitespace-pre-wrap">{p.text}</p>
             <div className="flex gap-2 flex-wrap">
-              {REACTIONS.map((e) => (
-                <button
-                  key={e}
-                  onClick={() => react(p.id, e)}
-                  className="text-xs bg-black/40 hover:bg-black/70 border border-white/5 rounded-full px-2 py-0.5 transition-colors"
-                >
-                  {e} {p.reactions?.[e] || ''}
-                </button>
-              ))}
+              {REACTIONS.map((e) => {
+                const selected = reactedLocally(p.id, e);
+                return (
+                  <button
+                    key={e}
+                    onClick={() => react(p.id, e)}
+                    aria-pressed={selected}
+                    className={`text-xs border rounded-full px-3 py-1.5 transition-colors ${
+                      selected
+                        ? 'bg-red-600/20 border-red-500 text-red-300'
+                        : 'bg-black/40 hover:bg-black/70 border-white/5 text-gray-200'
+                    }`}
+                  >
+                    {e} {p.reactions?.[e] || ''}
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -150,21 +214,30 @@ export default function MatchThread({ params }) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Your name (optional)"
-          className="w-full bg-transparent border-b border-white/10 text-sm text-white placeholder-gray-600 py-1 mb-2 outline-none focus:border-red-600"
+          aria-label="Your name (optional)"
+          className="w-full bg-transparent border-b border-white/10 text-sm text-white placeholder-gray-400 py-1 mb-2 outline-none focus:border-red-600"
         />
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="What did you think of that match?"
+          aria-label="Your comment"
           rows={2}
-          className="w-full bg-transparent text-sm text-white placeholder-gray-600 outline-none resize-none"
+          maxLength={500}
+          className="w-full bg-transparent text-sm text-white placeholder-gray-400 outline-none resize-none"
         />
-        <div className="flex justify-end mt-2">
+        <div className="flex justify-between items-center mt-2">
+          {postError ? (
+            <p className="text-red-400 text-xs">{postError}</p>
+          ) : (
+            <span />
+          )}
           <button
             onClick={addPost}
-            className="bg-red-600 hover:bg-red-500 text-white text-sm font-semibold px-4 py-1.5 rounded-md transition-colors"
+            disabled={posting}
+            className="bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-1.5 rounded-md transition-colors"
           >
-            Post
+            {posting ? 'Posting…' : 'Post'}
           </button>
         </div>
       </div>

@@ -43,7 +43,7 @@ function MatchCard({ match, count }) {
         <span className="text-white font-bold text-lg text-right">{match.away}</span>
       </div>
       <div className="mt-2 flex justify-between items-center">
-        <span className="text-xs text-gray-500">{display.label}</span>
+        <span className="text-xs text-gray-400">{display.label}</span>
         <span className="text-xs text-gray-400">{count} comments</span>
       </div>
     </Link>
@@ -73,18 +73,20 @@ export default function Home() {
 
   return (
     <div>
-      <header className="border-b border-red-900/30 px-5 py-4">
+      <header className="border-b border-red-900/30 bg-black/40 backdrop-blur-sm px-5 py-4">
         <h1 className="text-white font-extrabold text-2xl tracking-tight">
           KOP<span className="text-red-600">TALK</span>
         </h1>
-        <p className="text-gray-500 text-xs mt-0.5">Match reactions, straight from the Kop.</p>
+        <p className="text-gray-400 text-xs mt-0.5">Match reactions, straight from the Kop.</p>
       </header>
 
       <Ticker />
 
       <main className="px-5 py-6">
         <div className="max-w-2xl mx-auto space-y-3">
-          <p className="text-xs uppercase tracking-widest text-gray-500 mb-1">Match threads</p>
+          <p className="inline-block text-xs uppercase tracking-widest text-gray-300 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded mb-2">
+            Match threads
+          </p>
           {MATCHES.map((m) => (
             <MatchCard key={m.id} match={m} count={counts[m.id] || 0} />
           ))}
