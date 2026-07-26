@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
 import { getMatch } from '../../../lib/matches';
 import { useLiveScore } from '../../../lib/useLiveScore';
+import { useMatchGoals } from '../../../lib/useMatchGoals';
 import { deriveDisplay } from '../../../lib/liveScore';
 
 const REACTIONS = ['🔴', '⚽', '😱', '🔥', '😂'];
@@ -25,6 +26,10 @@ function reactedLocally(postId, emoji) {
 export default function MatchThread({ params }) {
   const match = getMatch(params.id);
   const live = useLiveScore(match?.footballDataId);
+  // Goal scorers/minutes come from api-football.com for real EPL fixtures;
+  // friendlies have no live feed, so fall back to a manually entered list.
+  const liveGoals = useMatchGoals(match?.footballDataId && match?.kickoff ? match.kickoff.slice(0, 10) : null);
+  const goals = match?.goals || liveGoals;
   const [posts, setPosts] = useState([]);
   const [name, setName] = useState('');
   const [text, setText] = useState('');
@@ -158,6 +163,21 @@ export default function MatchThread({ params }) {
           <span className="text-white font-bold text-xl text-right">{match.away}</span>
         </div>
         <div className="text-xs text-gray-400 mt-1">{matchDisplay.label}</div>
+
+        {goals.length > 0 && (
+          <div className="mt-3 pt-3 border-t border-white/5 space-y-1">
+            {goals.map((g, i) => (
+              <div key={i} className="text-xs text-gray-300 flex gap-1.5">
+                <span className="text-gray-500 font-mono shrink-0">{g.minute}'</span>
+                <span>
+                  ⚽ {g.scorer}
+                  {g.assist && <span className="text-gray-500"> (assist: {g.assist})</span>}
+                  <span className="text-gray-500"> — {g.team}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <p className="inline-block text-xs uppercase tracking-widest text-gray-300 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded mb-3">
