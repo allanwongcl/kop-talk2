@@ -40,13 +40,15 @@ git push -u origin main
 ## 5. Deploy on Vercel (free)
 
 1. Go to vercel.com → sign in with GitHub → **New Project** → import your `kop-talk` repo.
-2. Under **Environment Variables**, add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` (same values as your `.env.local`).
+2. Under **Environment Variables**, add `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `FOOTBALL_DATA_API_KEY` (same values as your `.env.local`).
 3. Click **Deploy**. You'll get a live URL like `kop-talk.vercel.app` in about a minute.
 4. Optional: add a custom domain under Project Settings → Domains.
 
 ## Updating fixtures
 
-Match data lives in `lib/matches.js` — hardcoded for now since it's preseason. Once the season proper starts and you want live scores/status pulled automatically, swap this file for a call to a football data API (e.g. football-data.org, api-football.com) and cache the response.
+The fixture list is pulled live from football-data.org (Premier League + Champions League) via `/api/fixtures` and refreshed every 60 seconds, so scores and kickoff → LIVE → FULL-TIME status update on their own. Needs `FOOTBALL_DATA_API_KEY` set.
+
+`lib/matches.js` still holds the bits the free API tier doesn't cover: `STATIC_MATCHES` (pre-season friendlies), `MANUAL_GOALS` (goal scorer lists — add by hand after a match, keyed by fixture id like `pl2`), and `FALLBACK_MATCHES` (shown only if the API is unreachable).
 
 ## Notes
 

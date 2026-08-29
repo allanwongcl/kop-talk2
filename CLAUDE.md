@@ -18,7 +18,12 @@ Supabase.
   counts per match from Supabase
 - `app/match/[id]/page.js` — a single match thread: comments + reactions
 - `app/layout.js` — root layout, sets page metadata
-- `lib/matches.js` — hardcoded fixture list (see "Updating fixtures" below)
+- `app/api/fixtures/route.js` — merges the live football-data.org fixture list
+  with the static friendlies + manual goals; cached 60s (see "Updating fixtures")
+- `app/api/match-goals/route.js` — goal events for a fixture via api-football.com
+- `lib/footballData.js` — football-data.org client + match→fixture mapping
+- `lib/matches.js` — friendlies, manual goal breakdowns, offline fallback
+- `lib/useFixtures.js` — client hook: polls `/api/fixtures` every 60s
 - `lib/supabaseClient.js` — creates the Supabase client from env vars
 - `supabase.sql` — run once in the Supabase SQL Editor; creates the `posts`
   table, RLS policies, and enables realtime
@@ -46,19 +51,42 @@ rather than assuming you can create them.
 
 ## Environment variables
 
-Required in `.env.local` (get these from Supabase → Project Settings → API):
+Required in `.env.local` (Supabase keys from Supabase → Project Settings → API;
+`FOOTBALL_DATA_API_KEY` from football-data.org):
 
 ```
 NEXT_PUBLIC_SUPABASE_URL=your-project-url.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+FOOTBALL_DATA_API_KEY=your-football-data-org-token
+API_FOOTBALL_KEY=your-api-football-com-key
 ```
+
+`FOOTBALL_DATA_API_KEY` is required for the live fixture list. `API_FOOTBALL_KEY`
+is only used for live goal scorers and currently returns nothing for this season
+on the free plan (goals fall back to `MANUAL_GOALS`). All four are already set
+locally and on Vercel.
 
 ## Updating fixtures
 
-Match data is hardcoded in `lib/matches.js` since it's currently preseason.
-Once the season proper starts and live scores are wanted, this should be
-swapped for a call to a football data API (football-data.org, api-football.com)
-with the response cached — don't do this until I ask for it.
+The fixture list is pulled live from football-data.org (Liverpool, team id 64 —
+Premier League + Champions League) through `/api/fixtures`, mapped in
+`lib/footballData.js`, and re-polled every 60s by `lib/useFixtures.js`. Scores
+and status (kickoff time → LIVE → HALF-TIME → FULL-TIME) update automatically,
+no redeploy. Fixture ids are `pl<matchday>` / `cl<matchday>` so Supabase comment
+threads stay attached across deploys.
+
+Three things still live in `lib/matches.js` because the free tier doesn't
+provide them:
+
+- `STATIC_MATCHES` — pre-season friendlies (no live feed exists). Hand-entered.
+- `MANUAL_GOALS` — goal scorer/assist breakdowns for competitive games, keyed by
+  fixture id (`pl2`, `cl1`, …). Add these by hand after a match.
+- `FALLBACK_MATCHES` — snapshot shown only if the API call fails. Keep it roughly
+  current so an outage doesn't show a stale/empty list.
+
+If Liverpool reach the CL knockout stage, fixtures with no `matchday` get the id
+`cl-<footballDataId>`; check `mapMatch` in `lib/footballData.js` handles the
+stage label the way you want.
 
 ## Notes / constraints
 

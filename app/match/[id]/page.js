@@ -3,10 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../../../lib/supabaseClient';
-import { getMatch } from '../../../lib/matches';
-import { useLiveScore } from '../../../lib/useLiveScore';
+import { useFixtures } from '../../../lib/useFixtures';
 import { useMatchGoals } from '../../../lib/useMatchGoals';
-import { deriveDisplay } from '../../../lib/liveScore';
 
 const REACTIONS = ['🔴', '⚽', '😱', '🔥', '😂'];
 
@@ -24,11 +22,14 @@ function reactedLocally(postId, emoji) {
 }
 
 export default function MatchThread({ params }) {
-  const match = getMatch(params.id);
-  const live = useLiveScore(match?.footballDataId);
-  // Goal scorers/minutes come from api-football.com for real EPL fixtures;
-  // friendlies have no live feed, so fall back to a manually entered list.
-  const liveGoals = useMatchGoals(match?.footballDataId && match?.kickoff ? match.kickoff.slice(0, 10) : null);
+  const { matches, loaded } = useFixtures();
+  const match = matches.find((m) => m.id === params.id);
+  // Goal scorers/minutes: real fixtures try api-football.com by date; friendlies
+  // and anything that feed doesn't cover fall back to a manually entered list
+  // (match.goals, from MANUAL_GOALS / STATIC_MATCHES in lib/matches.js).
+  const liveGoals = useMatchGoals(
+    match?.footballDataId && match?.kickoff ? match.kickoff.slice(0, 10) : null
+  );
   const goals = match?.goals || liveGoals;
   const [posts, setPosts] = useState([]);
   const [name, setName] = useState('');
@@ -132,13 +133,11 @@ export default function MatchThread({ params }) {
   if (!match) {
     return (
       <main className="px-5 py-6 max-w-2xl mx-auto">
-        <p className="text-gray-400">Match not found.</p>
+        <p className="text-gray-400">{loaded ? 'Match not found.' : 'Loading match…'}</p>
         <Link href="/" className="text-red-500 text-sm">← Back</Link>
       </main>
     );
   }
-
-  const matchDisplay = deriveDisplay(match, live);
 
   return (
     <main className="px-5 py-6 max-w-2xl mx-auto">
@@ -151,7 +150,7 @@ export default function MatchThread({ params }) {
           <span className="text-[11px] uppercase tracking-wider text-red-500 font-semibold">
             {match.comp}
           </span>
-          {matchDisplay.isLive && (
+          {match.live && (
             <span className="text-[11px] uppercase tracking-wider text-red-500 font-semibold animate-pulse">
               ● Live
             </span>
@@ -159,10 +158,10 @@ export default function MatchThread({ params }) {
         </div>
         <div className="flex items-center justify-between">
           <span className="text-white font-bold text-xl">{match.home}</span>
-          <span className="mx-3 text-3xl font-mono font-bold text-red-500">{matchDisplay.score}</span>
+          <span className="mx-3 text-3xl font-mono font-bold text-red-500">{match.score}</span>
           <span className="text-white font-bold text-xl text-right">{match.away}</span>
         </div>
-        <div className="text-xs text-gray-400 mt-1">{matchDisplay.label}</div>
+        <div className="text-xs text-gray-400 mt-1">{match.status}</div>
 
         {goals.length > 0 && (
           <div className="mt-3 pt-3 border-t border-white/5 space-y-1">

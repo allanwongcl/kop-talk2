@@ -3,12 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '../lib/supabaseClient';
-import { MATCHES } from '../lib/matches';
-import { useLiveScore } from '../lib/useLiveScore';
-import { deriveDisplay } from '../lib/liveScore';
+import { useFixtures } from '../lib/useFixtures';
 
-function Ticker() {
-  const text = MATCHES.map((m) => `${m.home} vs ${m.away} — ${m.status}`).join('    •    ');
+function Ticker({ matches }) {
+  const text = matches
+    .map((m) => `${m.home} vs ${m.away} — ${m.status}`)
+    .join('    •    ');
   return (
     <div className="overflow-hidden border-y border-red-900/40 bg-black">
       <div className="ticker-track whitespace-nowrap py-2 text-sm tracking-widest text-red-500 font-mono">
@@ -19,9 +19,6 @@ function Ticker() {
 }
 
 function MatchCard({ match, count }) {
-  const live = useLiveScore(match.footballDataId);
-  const display = deriveDisplay(match, live);
-
   return (
     <Link
       href={`/match/${match.id}`}
@@ -31,7 +28,7 @@ function MatchCard({ match, count }) {
         <span className="text-[11px] uppercase tracking-wider text-red-500 font-semibold">
           {match.comp}
         </span>
-        {display.isLive && (
+        {match.live && (
           <span className="text-[11px] uppercase tracking-wider text-red-500 font-semibold animate-pulse">
             ● Live
           </span>
@@ -39,11 +36,11 @@ function MatchCard({ match, count }) {
       </div>
       <div className="flex items-center justify-between">
         <span className="text-white font-bold text-lg">{match.home}</span>
-        <span className="mx-3 text-2xl font-mono font-bold text-red-500">{display.score}</span>
+        <span className="mx-3 text-2xl font-mono font-bold text-red-500">{match.score}</span>
         <span className="text-white font-bold text-lg text-right">{match.away}</span>
       </div>
       <div className="mt-2 flex justify-between items-center">
-        <span className="text-xs text-gray-400">{display.label}</span>
+        <span className="text-xs text-gray-400">{match.status}</span>
         <span className="text-xs text-gray-400">{count} comments</span>
       </div>
     </Link>
@@ -51,6 +48,7 @@ function MatchCard({ match, count }) {
 }
 
 export default function Home() {
+  const { matches } = useFixtures();
   const [counts, setCounts] = useState({});
 
   useEffect(() => {
@@ -80,14 +78,14 @@ export default function Home() {
         <p className="text-gray-400 text-xs mt-0.5">Match reactions, straight from the Kop.</p>
       </header>
 
-      <Ticker />
+      <Ticker matches={matches} />
 
       <main className="px-5 py-6">
         <div className="max-w-2xl mx-auto space-y-3">
           <p className="inline-block text-xs uppercase tracking-widest text-gray-300 bg-black/60 backdrop-blur-sm px-2.5 py-1 rounded mb-2">
             Match threads
           </p>
-          {MATCHES.map((m) => (
+          {matches.map((m) => (
             <MatchCard key={m.id} match={m} count={counts[m.id] || 0} />
           ))}
         </div>
