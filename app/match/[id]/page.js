@@ -24,11 +24,14 @@ function reactedLocally(postId, emoji) {
 export default function MatchThread({ params }) {
   const { matches, loaded } = useFixtures();
   const match = matches.find((m) => m.id === params.id);
-  // Goal scorers/minutes: real fixtures try api-football.com by date; friendlies
-  // and anything that feed doesn't cover fall back to a manually entered list
+  // Goal scorers/minutes: real fixtures try api-football.com by date, and the
+  // first successful fetch is cached in Supabase (lib/matchGoalsStore.js) so
+  // it survives past api-football's ~3-day date window. Friendlies and
+  // anything that feed doesn't cover fall back to a manually entered list
   // (match.goals, from MANUAL_GOALS / STATIC_MATCHES in lib/matches.js).
   const liveGoals = useMatchGoals(
-    match?.footballDataId && match?.kickoff ? match.kickoff.slice(0, 10) : null
+    match?.footballDataId ? match.id : null,
+    match?.kickoff ? match.kickoff.slice(0, 10) : null
   );
   const goals = match?.goals || liveGoals;
   const [posts, setPosts] = useState([]);
