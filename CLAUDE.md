@@ -20,11 +20,10 @@ Supabase.
 - `app/layout.js` — root layout, sets page metadata
 - `app/api/fixtures/route.js` — merges the live football-data.org fixture list
   with the static friendlies + manual goals; cached 60s (see "Updating fixtures")
-- `app/api/match-goals/route.js` — goal events for a fixture via api-football.com,
-  falling back to the Supabase cache once that API's date window closes (see
-  "Updating fixtures")
+- `app/api/match-goals/route.js` — goal events for a fixture from ESPN, falling
+  back to the Supabase cache if ESPN returns nothing (see "Updating fixtures")
 - `lib/footballData.js` — football-data.org client + match→fixture mapping
-- `lib/apiFootball.js` — api-football.com client (goal events by fixture date)
+- `lib/espn.js` — ESPN public match-feed client (goal scorers, minutes, assists)
 - `lib/matchGoalsStore.js` — reads/writes the `match_goals` cache table in Supabase
 - `lib/matches.js` — friendlies, manual goal breakdowns, offline fallback
 - `lib/useFixtures.js` — client hook: polls `/api/fixtures` every 60s
@@ -63,13 +62,12 @@ Required in `.env.local` (Supabase keys from Supabase → Project Settings → A
 NEXT_PUBLIC_SUPABASE_URL=your-project-url.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 FOOTBALL_DATA_API_KEY=your-football-data-org-token
-API_FOOTBALL_KEY=your-api-football-com-key
 ```
 
-`FOOTBALL_DATA_API_KEY` is required for the live fixture list. `API_FOOTBALL_KEY`
-is used for live goal scorers, but its free plan only allows looking a fixture
-up for ~3 days around today — see "Updating fixtures" for how that's cached so
-it isn't a recurring problem. All four are already set locally and on Vercel.
+`FOOTBALL_DATA_API_KEY` is required for the live fixture list. Goal scorers come
+from ESPN's public feed, which needs no key. (`API_FOOTBALL_KEY` is a leftover
+from the old api-football.com integration and can be deleted from `.env.local`
+and Vercel.) All three keys are already set locally and on Vercel.
 
 ## Updating fixtures
 
@@ -80,16 +78,15 @@ and status (kickoff time → LIVE → HALF-TIME → FULL-TIME) update automatica
 no redeploy. Fixture ids are `pl<matchday>` / `cl<matchday>` so Supabase comment
 threads stay attached across deploys.
 
-Goal scorers/assists for competitive fixtures come from api-football.com via
-`/api/match-goals` (`lib/apiFootball.js`), polled by `lib/useMatchGoals.js`
-whenever a match thread is open. Its free plan only allows looking a fixture
-up for ~3 days around today, so the first successful fetch for a match is
-cached in Supabase's `match_goals` table (`lib/matchGoalsStore.js`) and reused
-after that window closes — no manual entry needed as long as someone opens
-the match thread within a few days of kickoff. `MANUAL_GOALS` in
-`lib/matches.js` is now only a last-resort fallback for a match nobody opened
-in time; check it's actually empty for a fixture before typing scorers in by
-hand.
+Goal scorers/assists for competitive fixtures come from ESPN's public match
+feed via `/api/match-goals` (`lib/espn.js`), polled by `lib/useMatchGoals.js`
+whenever a match thread is open. It has no key and no date window, so past
+matches keep working. Each successful fetch is also cached in Supabase's
+`match_goals` table (`lib/matchGoalsStore.js`) as a fallback if ESPN is ever
+down or changes its (unofficial) feed. `MANUAL_GOALS` in `lib/matches.js`
+overrides the live feed for a fixture — only use it to correct a wrong or
+missing result. (The old api-football.com source was dropped: its free plan
+rejects the 2026 season entirely.)
 
 Two other things still live in `lib/matches.js` because the free tier doesn't
 provide them:

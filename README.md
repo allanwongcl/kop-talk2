@@ -48,7 +48,9 @@ git push -u origin main
 
 The fixture list is pulled live from football-data.org (Premier League + Champions League) via `/api/fixtures` and refreshed every 60 seconds, so scores and kickoff → LIVE → FULL-TIME status update on their own. Needs `FOOTBALL_DATA_API_KEY` set.
 
-`lib/matches.js` still holds the bits the free API tier doesn't cover: `STATIC_MATCHES` (pre-season friendlies), `MANUAL_GOALS` (goal scorer lists — add by hand after a match, keyed by fixture id like `pl2`), and `FALLBACK_MATCHES` (shown only if the API is unreachable).
+Goal scorers and assists come live from ESPN's public match feed (`lib/espn.js`, no key needed) whenever a match thread is open, and are cached in Supabase.
+
+`lib/matches.js` still holds the bits the free API tier doesn't cover: `STATIC_MATCHES` (pre-season friendlies), `MANUAL_GOALS` (optional hand-entered goal lists that override the live feed, keyed by fixture id like `pl2`), and `FALLBACK_MATCHES` (shown only if the API is unreachable).
 
 ## Notes
 

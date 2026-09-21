@@ -1,28 +1,26 @@
 import { NextResponse } from 'next/server';
-import { getFixtureIdByDate, getGoalEvents } from '../../../lib/apiFootball';
+import { getGoalEvents } from '../../../lib/espn';
 import { getCachedGoals, saveCachedGoals } from '../../../lib/matchGoalsStore';
 
-// Tries api-football.com first, since it's the only source with fresh data
-// while a fixture is inside the free plan's ~3-day date window. Any time
-// that succeeds, the result is saved to Supabase (lib/matchGoalsStore.js) so
-// the match stays covered once the window closes and the live lookup starts
-// coming back empty — no need to hand-enter it into MANUAL_GOALS.
+// Goal scorers come live from ESPN (lib/espn.js). Every successful fetch is
+// saved to Supabase (lib/matchGoalsStore.js) so a match stays covered if ESPN
+// is ever unreachable or changes its feed.
 export async function GET(request) {
-  const matchId = request.nextUrl.searchParams.get('matchId');
-  const date = request.nextUrl.searchParams.get('date');
+  const params = request.nextUrl.searchParams;
+  const matchId = params.get('matchId');
+  const kickoff = params.get('kickoff');
+  const home = params.get('home');
+  const away = params.get('away');
 
   if (!matchId) {
     return NextResponse.json({ error: 'Missing matchId' }, { status: 400 });
   }
 
-  if (date) {
-    const fixtureId = await getFixtureIdByDate(date);
-    if (fixtureId) {
-      const goals = await getGoalEvents(fixtureId);
-      if (goals.length > 0) {
-        await saveCachedGoals(matchId, goals);
-        return NextResponse.json({ goals, source: 'live' });
-      }
+  if (kickoff && home && away) {
+    const goals = await getGoalEvents({ matchId, kickoff, home, away });
+    if (goals.length > 0) {
+      await saveCachedGoals(matchId, goals);
+      return NextResponse.json({ goals, source: 'live' });
     }
   }
 

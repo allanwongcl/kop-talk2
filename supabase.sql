@@ -30,12 +30,9 @@ create policy "Anyone can update posts"
 -- Enable realtime so comments/reactions update live for everyone in a thread
 alter publication supabase_realtime add table posts;
 
--- Caches goal-scorer/assist events fetched from api-football.com (see
--- lib/apiFootball.js). Its free plan only allows looking a fixture up for
--- ~3 days around today, so the first successful fetch for a match is saved
--- here and reused forever after — no more re-typing scorers into
--- MANUAL_GOALS by hand once at least one fetch has succeeded while the
--- match was inside that window.
+-- Caches goal-scorer/assist events fetched live from ESPN (see lib/espn.js).
+-- Every successful fetch for a match is saved here, so the scorers still show
+-- if ESPN is ever unreachable or changes its feed.
 create table match_goals (
   match_id text primary key,
   goals jsonb not null,
